@@ -121,15 +121,48 @@ void cleanup(void)
 }
 
 
-void thread_func(atomic_bool& stop)
+class stats
 {
+public:
+
+	long long unsigned int total_elapsed_ticks = 0;
+	long long unsigned int total_bytes_received = 0;
+	long long unsigned int last_reported_at_ticks = 0;
+	long long unsigned int last_reported_total_bytes_received = 0;
+
+	double record_bps = 0;
+};
+
+
+void thread_func(atomic_bool& stop, atomic_bool& thread_done, vector< vector<char> >& vc, mutex& m, stats &s)
+{
+	thread_done = false;
+
 	while (!stop)
 	{
-		//m.lock();
-		//vs.push_back("test");
-		//m.unlock();
+		m.lock();
+
+		if (vc.size() > 0)
+		{
+			for (size_t i = 0; i < vc.size(); i++)
+			{
+				s.total_bytes_received += vc[i].size();
+			}
+
+//			senders[oss.str()].total_bytes_received += temp_bytes_received;
+
+			// do stuff
+		//	cout << "found " << vc.size() << " packet(s)" << endl;
+			vc.clear();
+		}
+
+		m.unlock();
 	}
+
+	thread_done = true;
 }
+
+
 
 
 
@@ -138,24 +171,29 @@ class recv_stats
 {
 public:
 
-	long long unsigned int total_elapsed_ticks = 0;
-	long long unsigned int total_bytes_received = 0;
-	long long unsigned int last_reported_at_ticks = 0;
-	long long unsigned int last_reported_total_bytes_received = 0;
-	
-	double record_bps = 0;
-
+	stats s;
 	thread t;
 	atomic_bool stop = false;
+	atomic_bool thread_done = false;
+	mutex m;
+
+	vector< vector<char> > packet_bufs;
 
 	recv_stats(void)
 	{
-		t = thread(thread_func, ref(stop));
+		t = thread(thread_func, ref(stop), ref(thread_done), ref(packet_bufs), ref(m), ref(s));
 	}
 
 	~recv_stats(void)
 	{
 		stop = true;
+
+		while (false == thread_done)
+		{
+
+
+			// cout << "Waiting for thread" << endl;
+		}
 
 		t.join();
 	}
@@ -300,10 +338,12 @@ int main(int argc, char** argv)
 				oss << static_cast<int>(their_addr.sin_addr.S_un.S_un_b.s_b3) << ".";
 				oss << static_cast<int>(their_addr.sin_addr.S_un.S_un_b.s_b4);
 
-				senders[oss.str()].total_bytes_received += temp_bytes_received;
+				vector<char> temp_buf = rx_buf;
+				temp_buf.resize(temp_bytes_received);
 
-				atomic_bool stop = false;
-				/*threads[oss.str()] = thread(thread_func, ref(stop));*/
+				senders[oss.str()].m.lock();
+				senders[oss.str()].packet_bufs.push_back(temp_buf);
+				senders[oss.str()].m.unlock();
 			}
 
 			const std::chrono::high_resolution_clock::time_point end_loop_ticks = std::chrono::high_resolution_clock::now();
@@ -314,31 +354,30 @@ int main(int argc, char** argv)
 				// One million microseconds per second
 				static const unsigned long long int ticks_per_second = 1000000;
 
-				i->second.total_elapsed_ticks += static_cast<unsigned long long int>(elapsed.count());
+				i->second.s.total_elapsed_ticks += static_cast<unsigned long long int>(elapsed.count());
 
-				if (i->second.total_elapsed_ticks >= i->second.last_reported_at_ticks + ticks_per_second)
+				if (i->second.s.total_elapsed_ticks >= i->second.s.last_reported_at_ticks + ticks_per_second)
 				{
-					const long long unsigned int actual_ticks = i->second.total_elapsed_ticks - i->second.last_reported_at_ticks;
-					const long long unsigned int bytes_sent_received_between_reports = i->second.total_bytes_received - i->second.last_reported_total_bytes_received;
+					const long long unsigned int actual_ticks = i->second.s.total_elapsed_ticks - i->second.s.last_reported_at_ticks;
+					const long long unsigned int bytes_sent_received_between_reports = i->second.s.total_bytes_received - i->second.s.last_reported_total_bytes_received;
 					const double bytes_per_second = static_cast<double>(bytes_sent_received_between_reports) / (static_cast<double>(actual_ticks) / static_cast<double>(ticks_per_second));
 
-					if (bytes_per_second > i->second.record_bps)
-						i->second.record_bps = bytes_per_second;
+					if (bytes_per_second > i->second.s.record_bps)
+						i->second.s.record_bps = bytes_per_second;
 
-					i->second.last_reported_at_ticks = i->second.total_elapsed_ticks;
-					i->second.last_reported_total_bytes_received = i->second.total_bytes_received;
+					i->second.s.last_reported_at_ticks = i->second.s.total_elapsed_ticks;
+					i->second.s.last_reported_total_bytes_received = i->second.s.total_bytes_received;
 
 					if (0.0 == bytes_per_second)
 					{
 						cout << "  " << i->first << " -- time out." << endl;
 						i = senders.erase(i);
-						//threads.erase(threads.find(i->first));
 					}
 					else
 					{
 						static const double mbits_factor = 8.0 / (1024.0 * 1024.0);
 
-						cout << "  " << i->first << " -- " << bytes_per_second * mbits_factor << " Mbit/s, Record: " << i->second.record_bps * mbits_factor << " Mbit/s" << endl;
+						cout << "  " << i->first << " -- " << bytes_per_second * mbits_factor << " Mbit/s, Record: " << i->second.s.record_bps * mbits_factor << " Mbit/s" << endl;
 						i++;
 					}
 				}
