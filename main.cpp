@@ -126,8 +126,8 @@ class packet
 public:
 
 	vector<char> packet_buf;
-	std::chrono::high_resolution_clock::time_point start_time_stamp;
-	std::chrono::high_resolution_clock::time_point end_time_stamp;
+	//std::chrono::high_resolution_clock::time_point start_time_stamp;
+	//std::chrono::high_resolution_clock::time_point end_time_stamp;
 
 };
 
@@ -147,7 +147,7 @@ public:
 };
 
 
-void thread_func(atomic_bool& stop, atomic_bool& thread_done, vector<packet>& vc, mutex& m, stats &s, string &ip_addr)
+void thread_func(atomic_bool& stop, atomic_bool& thread_done, vector<packet>& vc, mutex& m, stats& s, string& ip_addr)
 {
 	thread_done = false;
 
@@ -336,8 +336,6 @@ int main(int argc, char** argv)
 
 		while (1)
 		{
-			std::chrono::high_resolution_clock::time_point start_loop_ticks = std::chrono::high_resolution_clock::now();
-
 			timeval timeout;
 			timeout.tv_sec = 0;
 			timeout.tv_usec = 100000; // one hundred thousand microseconds is one-tenth of a second
@@ -354,7 +352,7 @@ int main(int argc, char** argv)
 				cleanup();
 				return 7;
 			}
-			else if(0 < select_ret)
+			else if (0 < select_ret)
 			{
 				int temp_bytes_received = 0;
 
@@ -374,8 +372,6 @@ int main(int argc, char** argv)
 				packet p;
 				p.packet_buf = rx_buf;
 				p.packet_buf.resize(temp_bytes_received);
-				p.start_time_stamp = start_loop_ticks;
-				p.end_time_stamp = std::chrono::high_resolution_clock::now();
 
 				// The element senders[oss.str()] is automatically created 
 				// if it doesn't already exist
