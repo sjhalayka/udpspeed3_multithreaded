@@ -126,7 +126,9 @@ class packet
 public:
 
 	vector<char> packet_buf;
-	std::chrono::high_resolution_clock::time_point time_stamp;
+	std::chrono::high_resolution_clock::time_point start_time_stamp;
+	std::chrono::high_resolution_clock::time_point end_time_stamp;
+
 };
 
 
@@ -141,7 +143,7 @@ public:
 
 	double record_bps = 0;
 
-	double bytes_per_second = 0;
+	double bytes_per_second = 0.0;
 };
 
 
@@ -149,29 +151,31 @@ void thread_func(atomic_bool& stop, atomic_bool& thread_done, vector<packet>& vc
 {
 	thread_done = false;
 
-	std::chrono::high_resolution_clock::time_point thread_start_time = std::chrono::high_resolution_clock::now();
-
 	while (!stop)
 	{
 		m.lock();
 
+		std::chrono::high_resolution_clock::time_point thread_start_time = std::chrono::high_resolution_clock::now();
+		std::chrono::high_resolution_clock::time_point thread_end_time = thread_start_time;
+
 		if (vc.size() > 0)
 		{
+			thread_start_time = vc[0].start_time_stamp;
+			thread_end_time = vc[vc.size() - 1].end_time_stamp;
+
 			for (size_t i = 0; i < vc.size(); i++)
 			{
-				// Do stuff with packet buffer here
+				// Do stuff with packet buffers here
 				s.total_bytes_received += vc[i].packet_buf.size();
 			}
 
 			vc.clear();
 		}
 
-		const std::chrono::high_resolution_clock::time_point thread_end_time = std::chrono::high_resolution_clock::now();
 		const std::chrono::duration<float, std::nano> elapsed = thread_end_time - thread_start_time;
-		thread_start_time = thread_end_time;
 		
 		static const double mbits_factor = 8.0 / (1024.0 * 1024.0);
-		static const unsigned long long int ticks_per_second = 1000000000;
+		static const long long unsigned int ticks_per_second = 1000000000;
 
 		if (elapsed.count() > 0)
 		{
@@ -192,18 +196,10 @@ void thread_func(atomic_bool& stop, atomic_bool& thread_done, vector<packet>& vc
 				if (0.0 == s.bytes_per_second)
 				{
 					cout << "  " << ip_addr << " -- time out." << endl;
-					
-					//stop = true;
-					//thread_done = true;
-					//m.unlock();
-					//return;
-
-					//i = senders.erase(i);
 				}
 				else
 				{
 					static const double mbits_factor = 8.0 / (1024.0 * 1024.0);
-
 					cout << "  " << ip_addr << " -- " << s.bytes_per_second * mbits_factor << " Mbit/s, Record: " << s.record_bps * mbits_factor << " Mbit/s" << endl;
 				}
 			}
@@ -346,6 +342,8 @@ int main(int argc, char** argv)
 
 		while (1)
 		{
+			std::chrono::high_resolution_clock::time_point start_loop_ticks = std::chrono::high_resolution_clock::now();
+
 			timeval timeout;
 			timeout.tv_sec = 0;
 			timeout.tv_usec = 100000; // one hundred thousand microseconds is one-tenth of a second
@@ -382,13 +380,21 @@ int main(int argc, char** argv)
 				packet p;
 				p.packet_buf = rx_buf;
 				p.packet_buf.resize(temp_bytes_received);
-				p.time_stamp = std::chrono::high_resolution_clock::now();
+				p.start_time_stamp = start_loop_ticks;
+				p.end_time_stamp = std::chrono::high_resolution_clock::now();
 
+				// The element senders[oss.str()] is automatically created 
+				// if it doesn't already exist
 				senders[oss.str()].m.lock();
 				senders[oss.str()].ip_addr = oss.str();
 				senders[oss.str()].packets.push_back(p);
 				senders[oss.str()].m.unlock();
 			}
+
+			/*const std::chrono::high_resolution_clock::time_point end_loop_ticks = std::chrono::high_resolution_clock::now();
+			const std::chrono::duration<float, std::nano> elapsed = end_loop_ticks - start_loop_ticks;*/
+
+
 		}
 	}
 
