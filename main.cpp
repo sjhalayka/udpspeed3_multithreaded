@@ -151,18 +151,14 @@ void thread_func(atomic_bool& stop, atomic_bool& thread_done, vector<packet>& vc
 {
 	thread_done = false;
 
+	std::chrono::high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
+
 	while (!stop)
 	{
 		m.lock();
 
-		std::chrono::high_resolution_clock::time_point thread_start_time = std::chrono::high_resolution_clock::now();
-		std::chrono::high_resolution_clock::time_point thread_end_time = thread_start_time;
-
 		if (vc.size() > 0)
 		{
-			thread_start_time = vc[0].start_time_stamp;
-			thread_end_time = vc[vc.size() - 1].end_time_stamp;
-
 			for (size_t i = 0; i < vc.size(); i++)
 			{
 				// Do stuff with packet buffers here
@@ -172,8 +168,11 @@ void thread_func(atomic_bool& stop, atomic_bool& thread_done, vector<packet>& vc
 			vc.clear();
 		}
 
-		const std::chrono::duration<float, std::nano> elapsed = thread_end_time - thread_start_time;
-		
+		std::chrono::high_resolution_clock::time_point end_time = std::chrono::high_resolution_clock::now();
+
+		const std::chrono::duration<float, std::nano> elapsed = end_time - start_time;
+		start_time = end_time;
+
 		static const double mbits_factor = 8.0 / (1024.0 * 1024.0);
 		static const long long unsigned int ticks_per_second = 1000000000;
 
@@ -354,6 +353,8 @@ int main(int argc, char** argv)
 
 			int select_ret = select(0, &fds, 0, 0, &timeout);
 
+			ostringstream oss;
+
 			if (SOCKET_ERROR == select_ret)
 			{
 				cout << "  Socket select error." << endl;
@@ -371,7 +372,6 @@ int main(int argc, char** argv)
 					return 8;
 				}
 
-				ostringstream oss;
 				oss << static_cast<int>(their_addr.sin_addr.S_un.S_un_b.s_b1) << ".";
 				oss << static_cast<int>(their_addr.sin_addr.S_un.S_un_b.s_b2) << ".";
 				oss << static_cast<int>(their_addr.sin_addr.S_un.S_un_b.s_b3) << ".";
@@ -391,10 +391,14 @@ int main(int argc, char** argv)
 				senders[oss.str()].m.unlock();
 			}
 
-			/*const std::chrono::high_resolution_clock::time_point end_loop_ticks = std::chrono::high_resolution_clock::now();
-			const std::chrono::duration<float, std::nano> elapsed = end_loop_ticks - start_loop_ticks;*/
-
-
+			// Kill threads that are timed out
+			for (map<string, recv_stats>::iterator i = senders.begin(); i != senders.end();)
+			{
+				if (i->second.s.bytes_per_second == 0.0 && i->second.s.record_bps != 0.0)
+					i = senders.erase(i);
+				else
+					i++;
+			}
 		}
 	}
 
