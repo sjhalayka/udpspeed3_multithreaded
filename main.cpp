@@ -141,9 +141,9 @@ public:
 	long long unsigned int last_reported_at_ticks = 0;
 	long long unsigned int last_reported_total_bytes_received = 0;
 
-	double record_bps = 0;
+	atomic<double> record_bps = 0;
 
-	double bytes_per_second = 0.0;
+	atomic<double> bytes_per_second = 0.0;
 };
 
 
@@ -168,8 +168,9 @@ void thread_func(atomic_bool& stop, atomic_bool& thread_done, vector<packet>& vc
 			vc.clear();
 		}
 
-		std::chrono::high_resolution_clock::time_point end_time = std::chrono::high_resolution_clock::now();
+		m.unlock();
 
+		const std::chrono::high_resolution_clock::time_point end_time = std::chrono::high_resolution_clock::now();
 		const std::chrono::duration<float, std::nano> elapsed = end_time - start_time;
 		start_time = end_time;
 
@@ -187,24 +188,18 @@ void thread_func(atomic_bool& stop, atomic_bool& thread_done, vector<packet>& vc
 				s.bytes_per_second = static_cast<double>(bytes_sent_received_between_reports) / (static_cast<double>(actual_ticks) / static_cast<double>(ticks_per_second));
 
 				if (s.bytes_per_second > s.record_bps)
-					s.record_bps = s.bytes_per_second;
+					s.record_bps = s.bytes_per_second.load();
 
 				s.last_reported_at_ticks = s.total_elapsed_ticks;
 				s.last_reported_total_bytes_received = s.total_bytes_received;
 
 				if (0.0 == s.bytes_per_second)
-				{
 					cout << "  " << ip_addr << " -- time out." << endl;
-				}
 				else
-				{
-					static const double mbits_factor = 8.0 / (1024.0 * 1024.0);
 					cout << "  " << ip_addr << " -- " << s.bytes_per_second * mbits_factor << " Mbit/s, Record: " << s.record_bps * mbits_factor << " Mbit/s" << endl;
-				}
 			}
 		}
 
-		m.unlock();
 	}
 
 	thread_done = true;
