@@ -353,8 +353,6 @@ int main(int argc, char** argv)
 
 			int select_ret = select(0, &fds, 0, 0, &timeout);
 
-			ostringstream oss;
-
 			if (SOCKET_ERROR == select_ret)
 			{
 				cout << "  Socket select error." << endl;
@@ -372,6 +370,7 @@ int main(int argc, char** argv)
 					return 8;
 				}
 
+				ostringstream oss;
 				oss << static_cast<int>(their_addr.sin_addr.S_un.S_un_b.s_b1) << ".";
 				oss << static_cast<int>(their_addr.sin_addr.S_un.S_un_b.s_b2) << ".";
 				oss << static_cast<int>(their_addr.sin_addr.S_un.S_un_b.s_b3) << ".";
