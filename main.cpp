@@ -104,9 +104,6 @@ bool init_options(const int& argc, char** argv, enum program_mode& mode, string&
 		return false;
 	}
 
-	cout.setf(ios::fixed, ios::floatfield);
-	cout.precision(2);
-
 	return verify_port(port_string, port_number);
 }
 
