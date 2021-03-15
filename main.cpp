@@ -126,8 +126,7 @@ class packet
 public:
 
 	vector<char> packet_buf;
-	std::chrono::high_resolution_clock::time_point start_time_stamp;
-//	std::chrono::high_resolution_clock::time_point end_time_stamp;
+	std::chrono::high_resolution_clock::time_point time_stamp;
 };
 
 
@@ -158,7 +157,7 @@ void thread_func(atomic_bool& stop, atomic_bool& thread_done, vector<packet>& vc
 
 		if (vc.size() > 0)
 		{
-			start_time = vc[0].start_time_stamp;
+			start_time = vc[0].time_stamp;
 
 			for (size_t i = 0; i < vc.size(); i++)
 			{
@@ -387,7 +386,7 @@ int main(int argc, char** argv)
 				packet p;
 				p.packet_buf = rx_buf;
 				p.packet_buf.resize(temp_bytes_received);
-				p.start_time_stamp = std::chrono::high_resolution_clock::now();
+				p.time_stamp = std::chrono::high_resolution_clock::now();
 
 				// The element senders[oss.str()] is automatically created 
 				// if it doesn't already exist
