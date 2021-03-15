@@ -255,7 +255,7 @@ public:
 
 int main(int argc, char** argv)
 {
-	cout << endl << "udpspeed_2 1.0 - UDP speed tester" << endl << "Copyright 2021, Shawn Halayka" << endl << endl;
+	cout << endl << "udpspeed_3 1.0 - UDP speed tester" << endl << "Copyright 2021, Shawn Halayka" << endl << endl;
 
 	program_mode mode = receive_mode;
 
