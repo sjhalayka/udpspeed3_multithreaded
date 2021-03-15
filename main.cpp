@@ -169,12 +169,15 @@ void thread_func(atomic_bool& stop, atomic_bool& thread_done, vector<packet>& vc
 		}
 
 		m.unlock();
+	
 
 		const std::chrono::high_resolution_clock::time_point end_time = std::chrono::high_resolution_clock::now();
 		const std::chrono::duration<float, std::nano> elapsed = end_time - start_time;
 
 		static const double mbits_factor = 8.0 / (1024.0 * 1024.0);
-		static const long long unsigned int ticks_per_second = 1000000000;
+		
+		const std::chrono::high_resolution_clock::period p;
+		const long long unsigned int ticks_per_second = p.den;
 
 		if (elapsed.count() > 0)
 		{
